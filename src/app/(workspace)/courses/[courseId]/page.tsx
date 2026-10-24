@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -25,6 +25,7 @@ import { ErrorState } from "@/components/feedback/error-state";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useSession } from "@/hooks/use-session";
 import { useCourse, useDeleteCourse } from "@/features/courses/hooks/use-courses";
 import { useModules } from "@/features/modules/hooks/use-modules";
 import { useContentItems } from "@/features/content/hooks/use-content";
@@ -38,18 +39,50 @@ export default function CourseDetailPage({
   const resolvedParams = use(params);
   const courseId = resolvedParams.courseId;
   const router = useRouter();
+  const { user } = useSession();
   const { canAccessCourse } = usePermissions();
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({
-    "mod-1": true,
-    "mod-4": true,
-    "mod-6": true,
-  });
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
 
   const { data: course, isLoading, isError, error } = useCourse(courseId);
-  const { data: modules = [] } = useModules(course?.id);
+  const { data: mockModules = [] } = useModules(course?.id);
   const { data: allContent = [] } = useContentItems();
   const deleteMutation = useDeleteCourse();
+
+  // Combine real backend modules with mock modules fallback
+  const displayModules = useMemo(() => {
+    if (!course) return [];
+    if (course.courseModules && course.courseModules.length > 0) {
+      return course.courseModules
+        .slice()
+        .sort((a, b) => a.order - b.order)
+        .map((cm) => ({
+          id: cm.module?.id || cm.moduleId || cm.id,
+          title: cm.module?.title || `Module ${cm.order}`,
+          description: cm.module?.description,
+          order: cm.order,
+          contentItems: (cm.module?.contentItems || []) as ContentItem[],
+        }));
+    }
+    return mockModules.map((m) => ({
+      id: m.id,
+      title: m.title,
+      description: m.description,
+      order: m.order,
+      contentItems: allContent.filter((c) => c.moduleId === m.id),
+    }));
+  }, [course, mockModules, allContent]);
+
+  const canEdit =
+    Boolean(course && canAccessCourse(course, "edit")) ||
+    user?.role === "MENTOR" ||
+    user?.role === "ADMIN";
+
+  const canDelete =
+    Boolean(course && canAccessCourse(course, "delete")) ||
+    user?.role === "ADMIN" ||
+    user?.role === "MENTOR";
 
   if (isLoading) {
     return (
@@ -76,9 +109,14 @@ export default function CourseDetailPage({
   };
 
   const handleDelete = () => {
+    setDeleteError(null);
     deleteMutation.mutate(course.id, {
       onSuccess: () => {
         router.push("/courses");
+      },
+      onError: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Failed to delete course";
+        setDeleteError(msg);
       },
     });
   };
@@ -103,7 +141,7 @@ export default function CourseDetailPage({
     <DashboardShell>
       <PageHeader
         title={course.title}
-        description={course.description}
+        description={course.description || undefined}
         breadcrumbs={[
           { label: "Courses", href: "/courses" },
           { label: course.title },
@@ -111,7 +149,7 @@ export default function CourseDetailPage({
         badge={<StatusBadge status={course.status} />}
         actions={
           <div className="flex items-center gap-2">
-            {canAccessCourse(course, "edit") && (
+            {canEdit && (
               <>
                 <Button asChild variant="outline" size="sm" className="gap-1.5">
                   <Link href={`/courses/${course.id}/modules`}>
@@ -125,12 +163,16 @@ export default function CourseDetailPage({
                 </Button>
               </>
             )}
-            {canAccessCourse(course, "delete") && (
+            {canDelete && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setDeleteOpen(true)}
+                onClick={() => {
+                  setDeleteError(null);
+                  setDeleteOpen(true);
+                }}
                 className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                title="Delete course"
               >
                 <Trash2 size={15} />
               </Button>
@@ -143,17 +185,23 @@ export default function CourseDetailPage({
       <div className="flex flex-wrap items-center gap-4 py-3 px-5 mb-8 rounded-2xl border border-slate-200 bg-white shadow-card text-xs text-slate-600">
         <div className="flex items-center gap-1.5">
           <Clock size={15} className="text-slate-400" />
-          <span>Estimated Hours: <strong>{course.estimatedHours} hrs</strong></span>
+          <span>
+            Estimated Hours: <strong>{course.estimatedHours ?? 10} hrs</strong>
+          </span>
         </div>
         <span className="text-slate-300">•</span>
         <div className="flex items-center gap-1.5">
           <BookOpen size={15} className="text-slate-400" />
-          <span>Difficulty: <strong>{course.level}</strong></span>
+          <span>
+            Difficulty: <strong>{course.level ?? "Standard"}</strong>
+          </span>
         </div>
         <span className="text-slate-300">•</span>
         <div className="flex items-center gap-1.5">
           <Layers size={15} className="text-slate-400" />
-          <span>Modules: <strong>{modules.length}</strong></span>
+          <span>
+            Modules: <strong>{displayModules.length}</strong>
+          </span>
         </div>
       </div>
 
@@ -161,7 +209,7 @@ export default function CourseDetailPage({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-900">Course Syllabus & Curriculum</h2>
-          {canAccessCourse(course, "edit") && (
+          {canEdit && (
             <Button asChild size="sm" variant="ghost" className="text-xs gap-1">
               <Link href={`/courses/${course.id}/modules`}>
                 <Plus size={14} /> Add Module
@@ -170,15 +218,15 @@ export default function CourseDetailPage({
           )}
         </div>
 
-        {modules.length === 0 ? (
+        {displayModules.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-500">
             No modules have been created for this course yet.
           </div>
         ) : (
           <div className="space-y-3">
-            {modules.map((mod, index) => {
-              const isOpen = !!expandedModules[mod.id];
-              const moduleItems = allContent.filter((c) => c.moduleId === mod.id);
+            {displayModules.map((mod, index) => {
+              const isOpen = expandedModules[mod.id] ?? index === 0;
+              const moduleItems = mod.contentItems || [];
 
               return (
                 <div
@@ -265,10 +313,19 @@ export default function CourseDetailPage({
 
       <ConfirmDialog
         open={deleteOpen}
-        onOpenChange={setDeleteOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteOpen(false);
+            setDeleteError(null);
+          }
+        }}
         title="Delete Course"
-        description={`Are you sure you want to permanently delete "${course.title}"? All modules and associated lessons will be removed.`}
-        confirmLabel="Delete"
+        description={
+          deleteError
+            ? `Deletion failed: ${deleteError}`
+            : `Are you sure you want to permanently delete "${course.title}"? This action cannot be undone.`
+        }
+        confirmLabel={deleteError ? "Retry Delete" : "Delete"}
         isLoading={deleteMutation.isPending}
         onConfirm={handleDelete}
       />

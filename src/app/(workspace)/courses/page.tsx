@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Edit3, Trash2, Eye } from "lucide-react";
+import { Plus, Edit3, Trash2, Eye, AlertCircle, RefreshCw } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { PageHeader } from "@/components/layout/page-header";
 import { FilterBar } from "@/components/tables/filter-bar";
@@ -24,8 +24,9 @@ export default function CoursesPage() {
   const [status, setStatus] = useState("ALL");
   const [page, setPage] = useState(1);
   const [deleteCourseId, setDeleteCourseId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const { data, isLoading } = useCourses({
+  const { data, isLoading, isError, error, refetch } = useCourses({
     page,
     limit: 6,
     search: search || undefined,
@@ -36,8 +37,15 @@ export default function CoursesPage() {
 
   const handleDelete = () => {
     if (deleteCourseId) {
+      setDeleteError(null);
       deleteMutation.mutate(deleteCourseId, {
-        onSuccess: () => setDeleteCourseId(null),
+        onSuccess: () => {
+          setDeleteCourseId(null);
+        },
+        onError: (err: unknown) => {
+          const message = err instanceof Error ? err.message : "Failed to delete course";
+          setDeleteError(message);
+        },
       });
     }
   };
@@ -53,7 +61,9 @@ export default function CoursesPage() {
           >
             {course.title}
           </Link>
-          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{course.description}</p>
+          {course.description ? (
+            <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{course.description}</p>
+          ) : null}
         </div>
       ),
     },
@@ -67,17 +77,25 @@ export default function CoursesPage() {
         <div className="text-xs text-slate-600">
           <span className="font-medium">{course.level ?? "Standard"}</span>
           <span className="text-slate-400"> • </span>
-          <span>{course.estimatedHours ?? 0} hrs</span>
+          <span>{course.estimatedHours ?? 10} hrs</span>
         </div>
       ),
     },
     {
       header: "Modules",
-      cell: (course) => (
-        <span className="text-xs font-semibold text-slate-700">
-          {course.moduleIds.length} modules
-        </span>
-      ),
+      cell: (course) => {
+        const count =
+          course.modulesCount ??
+          course._count?.modules ??
+          course._count?.courseModules ??
+          course.moduleIds?.length ??
+          0;
+        return (
+          <span className="text-xs font-semibold text-slate-700">
+            {count} {count === 1 ? "module" : "modules"}
+          </span>
+        );
+      },
     },
     {
       header: "Actions",
@@ -103,7 +121,10 @@ export default function CoursesPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setDeleteCourseId(course.id)}
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteCourseId(course.id);
+              }}
               className="h-8 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
               title="Delete course"
             >
@@ -132,6 +153,29 @@ export default function CoursesPage() {
           }
         />
 
+        {isError && (
+          <div
+            role="alert"
+            className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-800"
+          >
+            <div className="flex items-center gap-2.5">
+              <AlertCircle size={16} className="text-red-600 shrink-0" />
+              <span>
+                <strong>Unable to load courses:</strong>{" "}
+                {error instanceof Error ? error.message : "Network error occurred."}
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="h-8 border-red-200 bg-white text-xs hover:bg-red-100/50"
+            >
+              <RefreshCw size={13} className="mr-1" /> Retry
+            </Button>
+          </div>
+        )}
+
         <FilterBar
           search={search}
           onSearchChange={(val) => {
@@ -148,7 +192,6 @@ export default function CoursesPage() {
             { label: "All Statuses", value: "ALL" },
             { label: "Published", value: "PUBLISHED" },
             { label: "Drafts", value: "DRAFT" },
-            { label: "Archived", value: "ARCHIVED" },
           ]}
         />
 
@@ -170,10 +213,19 @@ export default function CoursesPage() {
 
         <ConfirmDialog
           open={Boolean(deleteCourseId)}
-          onOpenChange={(open) => !open && setDeleteCourseId(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeleteCourseId(null);
+              setDeleteError(null);
+            }
+          }}
           title="Delete Course"
-          description="Are you sure you want to delete this course? This action will cascade to all associated modules and cannot be undone."
-          confirmLabel="Delete"
+          description={
+            deleteError
+              ? `Deletion failed: ${deleteError}`
+              : "Are you sure you want to delete this course? This action will remove the course and cannot be undone."
+          }
+          confirmLabel={deleteError ? "Retry Delete" : "Delete"}
           isLoading={deleteMutation.isPending}
           onConfirm={handleDelete}
         />

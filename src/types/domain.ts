@@ -15,14 +15,43 @@ export interface User {
 
 export type CourseStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
+export interface CourseModuleAssociation {
+  id: string;
+  courseId: string;
+  moduleId: string;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
+  module?: {
+    id: string;
+    title: string;
+    description?: string | null;
+    isPublished?: boolean;
+    createdById?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    contentItems?: ContentItem[];
+  };
+}
+
 export interface Course {
   id: string;
   title: string;
   slug: string;
   description: string;
   status: CourseStatus;
+  isPublished?: boolean;
+  imageUrl?: string | null;
+  createdById?: string;
   mentorIds: string[];
   moduleIds: string[];
+  modulesCount?: number;
+  _count?: {
+    modules?: number;
+    courseModules?: number;
+  };
+  courseModules?: CourseModuleAssociation[];
+  modules?: unknown[];
   level?: "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
   estimatedHours?: number;
   createdAt: string;

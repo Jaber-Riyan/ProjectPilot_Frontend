@@ -6,6 +6,7 @@ import { courseService } from "@/lib/services/course.service";
 import { useSession } from "@/hooks/use-session";
 import type { PaginationParams } from "@/types/common";
 import type { Course } from "@/types/domain";
+import type { CreateCourseInput, UpdateCourseInput } from "@/features/courses/schemas/course.schema";
 
 export function useCourses(params?: PaginationParams) {
   const { user } = useSession();
@@ -31,7 +32,7 @@ export function useCreateCourse() {
   const { user } = useSession();
 
   return useMutation({
-    mutationFn: (input: Omit<Course, "id" | "createdAt" | "updatedAt">) =>
+    mutationFn: (input: CreateCourseInput | Omit<Course, "id" | "createdAt" | "updatedAt">) =>
       courseService.create(input, user),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courses.all() });
@@ -49,11 +50,14 @@ export function useUpdateCourse() {
       updates,
     }: {
       id: string;
-      updates: Partial<Omit<Course, "id" | "createdAt">>;
+      updates: UpdateCourseInput | Partial<Omit<Course, "id" | "createdAt">>;
     }) => courseService.update(id, updates, user),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courses.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.courses.detail(variables.id) });
+      if (_data?.slug) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.courses.detail(_data.slug) });
+      }
     },
   });
 }

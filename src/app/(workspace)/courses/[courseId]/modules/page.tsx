@@ -33,6 +33,7 @@ import { AccessDenied } from "@/components/access/access-denied";
 import { DetailLoadingSkeleton } from "@/components/feedback/loading-state";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useSession } from "@/hooks/use-session";
 import { useCourse } from "@/features/courses/hooks/use-courses";
 import {
   useModules,
@@ -54,6 +55,7 @@ export default function CourseModulesManagementPage({
 }) {
   const resolvedParams = use(params);
   const courseId = resolvedParams.courseId;
+  const { user } = useSession();
   const { canAccessCourse } = usePermissions();
 
   const { data: course, isLoading: isCourseLoading } = useCourse(courseId);
@@ -115,12 +117,19 @@ export default function CourseModulesManagementPage({
     );
   }
 
-  if (!course || !canAccessCourse(course, "edit")) {
+  const canManage =
+    Boolean(course && canAccessCourse(course, "edit")) ||
+    user?.role === "MENTOR" ||
+    user?.role === "ADMIN";
+
+  console.log(canManage);
+
+  if (!course || !canManage) {
     return (
       <DashboardShell>
         <AccessDenied
           title="Module Management Restricted"
-          description="Only assigned mentors or administrators can add or remove modules from this course."
+          description="Only mentors or administrators can add or remove modules from this course."
         />
       </DashboardShell>
     );

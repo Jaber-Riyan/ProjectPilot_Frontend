@@ -12,12 +12,19 @@ export const courseSchema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must only contain lowercase letters, numbers, and hyphens"),
   description: z
     .string()
-    .min(10, "Description must be at least 10 characters")
-    .max(1000, "Description cannot exceed 1000 characters"),
-  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
-  level: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]).default("BEGINNER"),
-  estimatedHours: z.coerce.number().min(1, "Must be at least 1 hour").max(500, "Maximum 500 hours"),
-  mentorIds: z.array(z.string()).default([]),
+    .max(1000, "Description cannot exceed 1000 characters")
+    .optional()
+    .or(z.literal("")),
+  imageUrl: z
+    .string()
+    .url("Image URL must be a valid URL")
+    .optional()
+    .or(z.literal("")),
+  isPublished: z.boolean().default(false),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT").optional(),
+  level: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]).default("BEGINNER").optional(),
+  estimatedHours: z.coerce.number().min(1, "Must be at least 1 hour").max(500, "Maximum 500 hours").default(10).optional(),
+  mentorIds: z.array(z.string()).default([]).optional(),
 });
 
 export type CourseFormValues = z.infer<typeof courseSchema>;

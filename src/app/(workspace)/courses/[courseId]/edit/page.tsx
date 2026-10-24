@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DetailLoadingSkeleton } from "@/components/feedback/loading-state";
 import { AccessDenied } from "@/components/access/access-denied";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useSession } from "@/hooks/use-session";
 import { useCourse, useUpdateCourse } from "@/features/courses/hooks/use-courses";
 import { courseSchema, type CourseFormValues } from "@/features/courses/schemas/course.schema";
 
@@ -26,6 +27,7 @@ export default function EditCoursePage({
   const resolvedParams = use(params);
   const courseId = resolvedParams.courseId;
   const router = useRouter();
+  const { user } = useSession();
   const { canAccessCourse } = usePermissions();
   const { data: course, isLoading, isError } = useCourse(courseId);
   const updateMutation = useUpdateCourse();
@@ -44,8 +46,10 @@ export default function EditCoursePage({
       reset({
         title: course.title,
         slug: course.slug,
-        description: course.description,
+        description: course.description ?? "",
+        imageUrl: course.imageUrl ?? "",
         status: course.status,
+        isPublished: course.isPublished ?? course.status === "PUBLISHED",
         level: course.level ?? "BEGINNER",
         estimatedHours: course.estimatedHours ?? 10,
         mentorIds: course.mentorIds,
@@ -69,22 +73,31 @@ export default function EditCoursePage({
     );
   }
 
-  if (!canAccessCourse(course, "edit")) {
+  const canEdit =
+    canAccessCourse(course, "edit") ||
+    user?.role === "MENTOR" ||
+    user?.role === "ADMIN";
+
+  if (!canEdit) {
     return (
       <DashboardShell>
         <AccessDenied
           title="Course Edit Restricted"
-          description="Only the assigned mentor or an administrator can modify this course."
+          description="Only mentors or administrators can modify this course."
         />
       </DashboardShell>
     );
   }
 
   const onSubmit = (values: CourseFormValues) => {
+    const isPublished = values.status === "PUBLISHED" || values.isPublished;
     updateMutation.mutate(
       {
         id: course.id,
-        updates: values,
+        updates: {
+          ...values,
+          isPublished,
+        },
       },
       {
         onSuccess: () => {
@@ -129,8 +142,19 @@ export default function EditCoursePage({
               </FormField>
 
               <FormField
+                label="Banner Image URL (Optional)"
+                error={errors.imageUrl?.message}
+                description="Public image URL for course card and cover display."
+              >
+                <Input
+                  type="url"
+                  {...register("imageUrl")}
+                  placeholder="https://images.unsplash.com/photo-..."
+                />
+              </FormField>
+
+              <FormField
                 label="Course Description"
-                required
                 error={errors.description?.message}
               >
                 <Textarea {...register("description")} rows={4} />
@@ -141,7 +165,6 @@ export default function EditCoursePage({
                   <Select {...register("status")}>
                     <option value="DRAFT">Draft</option>
                     <option value="PUBLISHED">Published</option>
-                    <option value="ARCHIVED">Archived</option>
                   </Select>
                 </FormField>
 
@@ -155,7 +178,6 @@ export default function EditCoursePage({
 
                 <FormField
                   label="Estimated Hours"
-                  required
                   error={errors.estimatedHours?.message}
                 >
                   <Input type="number" min={1} max={500} {...register("estimatedHours")} />

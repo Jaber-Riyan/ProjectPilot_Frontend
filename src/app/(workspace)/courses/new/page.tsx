@@ -33,7 +33,9 @@ export default function CreateCoursePage() {
       title: "",
       slug: "",
       description: "",
+      imageUrl: "",
       status: "DRAFT",
+      isPublished: false,
       level: "BEGINNER",
       estimatedHours: 20,
       mentorIds: user?.id ? [user.id] : [],
@@ -52,11 +54,12 @@ export default function CreateCoursePage() {
   };
 
   const onSubmit = (values: CourseFormValues) => {
+    const isPublished = values.status === "PUBLISHED" || values.isPublished;
     createMutation.mutate(
       {
         ...values,
+        isPublished,
         mentorIds: user?.id ? [user.id] : [],
-        moduleIds: [],
       },
       {
         onSuccess: (newCourse) => {
@@ -105,8 +108,19 @@ export default function CreateCoursePage() {
                 </FormField>
 
                 <FormField
+                  label="Banner Image URL (Optional)"
+                  error={errors.imageUrl?.message}
+                  description="Public image URL for course card and cover display."
+                >
+                  <Input
+                    type="url"
+                    {...register("imageUrl")}
+                    placeholder="https://images.unsplash.com/photo-..."
+                  />
+                </FormField>
+
+                <FormField
                   label="Course Description"
-                  required
                   error={errors.description?.message}
                   description="Detailed overview of syllabus, prerequisites, and learning outcomes."
                 >
@@ -122,7 +136,6 @@ export default function CreateCoursePage() {
                     <Select {...register("status")}>
                       <option value="DRAFT">Draft</option>
                       <option value="PUBLISHED">Published</option>
-                      <option value="ARCHIVED">Archived</option>
                     </Select>
                   </FormField>
 
@@ -136,7 +149,6 @@ export default function CreateCoursePage() {
 
                   <FormField
                     label="Estimated Hours"
-                    required
                     error={errors.estimatedHours?.message}
                   >
                     <Input type="number" min={1} max={500} {...register("estimatedHours")} />

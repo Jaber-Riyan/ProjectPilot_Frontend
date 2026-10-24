@@ -44,22 +44,32 @@ export function canAccessCourse(
   action: "view" | "edit" | "delete" = "view"
 ): boolean {
   if (action === "delete") {
-    return user?.role === "ADMIN";
+    if (user?.role === "ADMIN") return true;
+    if (user?.role === "MENTOR" && (!course.mentorIds || course.mentorIds.length === 0)) return true;
+    return false;
   }
 
   if (action === "edit") {
     if (!user) return false;
     if (user.role === "ADMIN") return true;
     if (user.role === "MENTOR") {
-      return course.mentorIds.includes(user.id);
+      if (course.mentorIds && course.mentorIds.length > 0) {
+        return course.mentorIds.includes(user.id) || course.createdById === user.id;
+      }
+      return true;
     }
     return false;
   }
 
   // action === 'view'
   if (user?.role === "ADMIN") return true;
-  if (course.status === "PUBLISHED") return true;
-  if (user?.role === "MENTOR" && course.mentorIds.includes(user.id)) return true;
+  if (course.status === "PUBLISHED" || course.isPublished === true) return true;
+  if (user?.role === "MENTOR") {
+    if (course.mentorIds && course.mentorIds.length > 0) {
+      return course.mentorIds.includes(user.id) || course.createdById === user.id;
+    }
+    return true;
+  }
   return false;
 }
 
