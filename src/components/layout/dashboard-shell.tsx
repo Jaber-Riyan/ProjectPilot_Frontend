@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpenCheck,
   Menu,
@@ -16,8 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useSession } from "@/hooks/use-session";
 import { getAuthorizedNavigation } from "@/config/navigation";
-import { DevMockBanner } from "./dev-mock-banner";
 import { StatusBadge } from "@/components/feedback/status-badge";
+import { LogoutConfirmModal } from "@/components/feedback/logout-confirm-modal";
 
 export function DashboardShell({
   children,
@@ -26,8 +26,22 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { user, role, logout } = useSession();
+
+  const handleConfirmLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      setLogoutModalOpen(false);
+      router.push("/login");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   // Navigation items filtered by the user's granular permissions
   const authorizedLinks = getAuthorizedNavigation(user);
@@ -120,9 +134,9 @@ export function DashboardShell({
               </div>
             </div>
             <button
-              onClick={() => logout()}
+              onClick={() => setLogoutModalOpen(true)}
               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-              title="Sign Out (Switch to Guest)"
+              title="Sign Out"
             >
               <LogOut size={16} />
             </button>
@@ -141,7 +155,7 @@ export function DashboardShell({
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <DevMockBanner />
+      {/* <DevMockBanner /> */}
 
       <div className="flex-1 flex">
         {/* Desktop Sidebar */}
@@ -211,6 +225,13 @@ export function DashboardShell({
           </main>
         </div>
       </div>
+
+      <LogoutConfirmModal
+        open={logoutModalOpen}
+        onOpenChange={setLogoutModalOpen}
+        onConfirm={handleConfirmLogout}
+        isLoading={isLoggingOut}
+      />
     </div>
   );
 }

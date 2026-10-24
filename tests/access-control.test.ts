@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { PERMISSIONS } from "../src/lib/access/permissions.ts";
-import { ROLE_PERMISSIONS } from "../src/lib/access/role-permissions.ts";
+import { PERMISSIONS } from "../src/lib/access/permissions";
+import { ROLE_PERMISSIONS } from "../src/lib/access/role-permissions";
 import {
   hasPermission,
   hasAnyPermission,
@@ -10,26 +10,28 @@ import {
   canAccessCourse,
   canAccessSubmission,
   canAccessAssignment,
-} from "../src/lib/access/access-control.ts";
+} from "../src/lib/access/access-control";
 import {
   canAccessRoute,
   matchRoutePattern,
   findRouteRule,
-} from "../src/lib/access/route-access.ts";
-import { courseService } from "../src/lib/services/course.service.ts";
-import { assignmentService } from "../src/lib/services/assignment.service.ts";
-import { submissionService } from "../src/lib/services/submission.service.ts";
-import { reviewService } from "../src/lib/services/review.service.ts";
-import { userService } from "../src/lib/services/user.service.ts";
-import { mockStore } from "../src/lib/mock-data/store.ts";
-import type { CurrentUser } from "../src/types/auth.ts";
-import type { Course, Submission, Assignment } from "../src/types/domain.ts";
+} from "../src/lib/access/route-access";
+import { courseService } from "../src/lib/services/course.service";
+import { assignmentService } from "../src/lib/services/assignment.service";
+import { submissionService } from "../src/lib/services/submission.service";
+import { reviewService } from "../src/lib/services/review.service";
+import { userService } from "../src/lib/services/user.service";
+import { mockStore } from "../src/lib/mock-data/store";
+import type { CurrentUser } from "../src/types/auth";
+import type { Course, Submission, Assignment } from "../src/types/domain";
 
 const studentUser: CurrentUser = {
   id: "user-student-001",
   name: "Demo Student",
   email: "student@projectpilot.dev",
   role: "STUDENT",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
 };
 
 const otherStudentUser: CurrentUser = {
@@ -37,6 +39,8 @@ const otherStudentUser: CurrentUser = {
   name: "Jane Learner",
   email: "jane.learner@projectpilot.dev",
   role: "STUDENT",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
 };
 
 const mentorUser: CurrentUser = {
@@ -44,6 +48,8 @@ const mentorUser: CurrentUser = {
   name: "Demo Mentor",
   email: "mentor@projectpilot.dev",
   role: "MENTOR",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
 };
 
 const otherMentorUser: CurrentUser = {
@@ -51,6 +57,8 @@ const otherMentorUser: CurrentUser = {
   name: "Marcus Vance",
   email: "marcus.mentor@projectpilot.dev",
   role: "MENTOR",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
 };
 
 const adminUser: CurrentUser = {
@@ -58,6 +66,8 @@ const adminUser: CurrentUser = {
   name: "Demo Admin",
   email: "admin@projectpilot.dev",
   role: "ADMIN",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
 };
 
 test("1. Permission Matrix & Basic Role Checks", async (t) => {
