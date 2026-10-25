@@ -65,4 +65,24 @@ export const queryKeys = {
       [...queryKeys.users.all(), "list", params ?? {}] as const,
     detail: (id: string) => [...queryKeys.users.all(), "detail", id] as const,
   },
+
+  dashboard: {
+    all: () => [...queryKeys.all, "dashboard"] as const,
+    student: (params?: Record<string, unknown>) =>
+      [...queryKeys.dashboard.all(), "student", params ?? {}] as const,
+    studentSubmissions: (params?: Record<string, unknown>) =>
+      [...queryKeys.dashboard.all(), "student", "submissions", params ?? {}] as const,
+    mentor: (params?: Record<string, unknown>) =>
+      [...queryKeys.dashboard.all(), "mentor", params ?? {}] as const,
+    mentorSubmissions: (params?: Record<string, unknown>) =>
+      [...queryKeys.dashboard.all(), "mentor", "submissions", params ?? {}] as const,
+    mentorCourses: (params?: Record<string, unknown>) =>
+      [...queryKeys.dashboard.all(), "mentor", "courses", params ?? {}] as const,
+    admin: (params?: Record<string, unknown>) =>
+      [...queryKeys.dashboard.all(), "admin", params ?? {}] as const,
+    adminUsers: (params?: Record<string, unknown>) =>
+      [...queryKeys.dashboard.all(), "admin", "users", params ?? {}] as const,
+    adminSubmissions: (params?: Record<string, unknown>) =>
+      [...queryKeys.dashboard.all(), "admin", "submissions", params ?? {}] as const,
+  },
 };

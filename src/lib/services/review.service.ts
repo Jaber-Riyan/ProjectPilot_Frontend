@@ -5,10 +5,13 @@ import {
   assignmentRepository,
   courseRepository,
 } from "@/lib/repositories";
-import type { Review, SubmissionStatus } from "@/types/domain";
+import type { Review, Submission, SubmissionStatus, ReviewQueueFilters } from "@/types/domain";
+import type { PaginatedResult } from "@/types/common";
 import type { CurrentUser } from "@/types/auth";
 import { hasPermission } from "@/lib/access/access-control";
 import { PERMISSIONS } from "@/lib/access/permissions";
+import { paginateArray } from "@/lib/repositories/mock/pagination-helper";
+import { normalizeSubmission } from "@/lib/services/submission.service";
 
 export class ReviewService {
   private isTestEnv(): boolean {
@@ -18,6 +21,114 @@ export class ReviewService {
         Boolean(process.env.NODE_TEST_CONTEXT) ||
         !process.env.NEXT_PUBLIC_API_BASE_URL)
     );
+  }
+
+  /**
+   * Retrieves the mentor review queue.
+   * Connects to GET /api/v1/mentor/submissions
+   * Accessible by MENTOR and ADMIN.
+   */
+  async getReviewQueue(
+    filters?: ReviewQueueFilters,
+    user?: CurrentUser | null
+  ): Promise<PaginatedResult<Submission>> {
+    if (!user || (!hasPermission(user, PERMISSIONS.REVIEW_CREATE) && user.role !== "MENTOR" && user.role !== "ADMIN")) {
+      throw new Error("Access denied: only mentors and administrators can view the review queue.");
+    }
+
+    if (this.isTestEnv()) {
+      const allSubmissions = await submissionRepository.list({ limit: 1000, page: 1 });
+      let items = allSubmissions.items;
+
+      if (user.role === "MENTOR") {
+        const allCourses = await courseRepository.list({ limit: 1000, page: 1 });
+        const assignedCourseIds = allCourses.items
+          .filter((c) => c.mentorIds.includes(user.id))
+          .map((c) => c.id);
+
+        const allAssignments = await assignmentRepository.list({ limit: 1000, page: 1 });
+        const mentorAssignmentIds = allAssignments.items
+          .filter(
+            (a) =>
+              a.createdById === user.id ||
+              (a.courseId && assignedCourseIds.includes(a.courseId))
+          )
+          .map((a) => a.id);
+
+        items = items.filter((s) => mentorAssignmentIds.includes(s.assignmentId));
+      }
+
+      if (filters?.status) {
+        items = items.filter((s) => s.status === filters.status);
+      } else {
+        // By default, queue prioritizes pending/under-review
+        items = items.filter(
+          (s) => s.status === "PENDING" || s.status === "UNDER_REVIEW"
+        );
+      }
+
+      if (filters?.assignmentId) {
+        items = items.filter((s) => s.assignmentId === filters.assignmentId);
+      }
+      if (filters?.studentId) {
+        items = items.filter((s) => s.studentId === filters.studentId);
+      }
+
+      return paginateArray(items, filters?.page, filters?.limit);
+    }
+
+    const searchParams = new URLSearchParams();
+    if (filters?.page) searchParams.set("page", String(filters.page));
+    if (filters?.limit) searchParams.set("limit", String(filters.limit));
+    if (filters?.status) searchParams.set("status", filters.status);
+    if (filters?.assignmentId) searchParams.set("assignmentId", filters.assignmentId);
+    if (filters?.studentId) searchParams.set("studentId", filters.studentId);
+    if (filters?.startDate) searchParams.set("startDate", filters.startDate);
+    if (filters?.endDate) searchParams.set("endDate", filters.endDate);
+
+    const queryStr = searchParams.toString();
+    const path = queryStr ? `mentor/submissions?${queryStr}` : "mentor/submissions";
+
+    const response = await apiRequest<{
+      items: unknown[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    }>(path, { method: "GET" });
+
+    return {
+      ...response,
+      items: (response.items || []).map(normalizeSubmission),
+    };
+  }
+
+  /**
+   * Retrieves detailed submission information for mentor/admin review inspection.
+   * Connects to GET /api/v1/mentor/submissions/:submissionId
+   */
+  async getSubmissionDetailForReview(
+    submissionId: string,
+    user?: CurrentUser | null
+  ): Promise<Submission> {
+    if (!user || (user.role !== "MENTOR" && user.role !== "ADMIN")) {
+      throw new Error("Access denied: only mentors and administrators can inspect submissions for review.");
+    }
+
+    if (this.isTestEnv()) {
+      const sub = await submissionRepository.getById(submissionId);
+      if (!sub) throw new Error("Submission not found.");
+      return sub;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const raw = await apiRequest<any>(`mentor/submissions/${submissionId}`, {
+      method: "GET",
+    });
+
+    return normalizeSubmission(raw);
   }
 
   /**

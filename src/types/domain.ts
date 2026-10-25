@@ -272,3 +272,179 @@ export interface Review {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ReviewQueueFilters {
+  page?: number;
+  limit?: number;
+  status?: SubmissionStatus;
+  assignmentId?: string;
+  studentId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface SubmissionStatusCounts {
+  PENDING: number;
+  UNDER_REVIEW: number;
+  APPROVED: number;
+  REJECTED: number;
+  RESUBMISSION_REQUESTED: number;
+}
+
+export interface StudentDashboardSummary {
+  overview: {
+    accessibleCoursesCount: number;
+    accessibleAssignmentsCount: number;
+    totalSubmissionsCount: number;
+    completedAssignmentsCount: number;
+    pendingReviewsCount: number;
+    completionRate: number;
+  };
+  submissionsByStatus: SubmissionStatusCounts;
+  recentSubmissions: Array<{
+    id: string;
+    projectName: string;
+    attemptNumber: number;
+    status: SubmissionStatus;
+    repoUrl: string;
+    liveUrl: string | null;
+    createdAt: string;
+    updatedAt: string;
+    reviewedAt: string | null;
+    assignment: {
+      id: string;
+      title: string;
+    };
+    reviewedBy: {
+      id: string;
+      name: string;
+    } | null;
+    feedbacksCount: number;
+    latestFeedback: {
+      id: string;
+      comment: string;
+      createdAt: string;
+      mentor: {
+        id: string;
+        name: string;
+      };
+    } | null;
+  }>;
+  notes: {
+    enrollmentModel: string;
+    completionCriteria: string;
+  };
+}
+
+export interface MentorDashboardSummary {
+  overview: {
+    manageableCoursesCount: number;
+    manageableModulesCount: number;
+    manageableAssignmentsCount: number;
+    pendingReviewsCount: number;
+    totalSubmissionsReceived: number;
+    reviewedSubmissionsCount: number;
+    totalFeedbacksGiven: number;
+  };
+  submissionsByStatus: SubmissionStatusCounts;
+  recentSubmissions: Array<{
+    id: string;
+    projectName: string;
+    attemptNumber: number;
+    status: SubmissionStatus;
+    repoUrl: string;
+    liveUrl: string | null;
+    createdAt: string;
+    student: {
+      id: string;
+      name: string;
+      email: string;
+    };
+    assignment: {
+      id: string;
+      title: string;
+    };
+  }>;
+  recentReviews: Array<{
+    id: string;
+    comment: string;
+    createdAt: string;
+    submission: {
+      id: string;
+      projectName: string;
+      status: SubmissionStatus;
+      attemptNumber: number;
+      student: {
+        id: string;
+        name: string;
+        email: string;
+      };
+      assignment: {
+        id: string;
+        title: string;
+      };
+    };
+  }>;
+}
+
+export interface AdminDashboardSummary {
+  users: {
+    total: number;
+    byRole: {
+      STUDENT: number;
+      MENTOR: number;
+      ADMIN: number;
+    };
+    byStatus: {
+      active: number;
+      inactive: number;
+    };
+  };
+  courses: {
+    total: number;
+    published: number;
+    draft: number;
+  };
+  modules: {
+    total: number;
+    published: number;
+    draft: number;
+  };
+  assignments: {
+    total: number;
+    published: number;
+    draft: number;
+  };
+  submissions: {
+    total: number;
+    byStatus: SubmissionStatusCounts;
+    pendingReviewTotal: number;
+  };
+  recentActivity: {
+    recentUsers: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: UserRole;
+      isActive: boolean;
+      createdAt: string;
+    }>;
+    recentSubmissions: Array<{
+      id: string;
+      projectName: string;
+      status: SubmissionStatus;
+      attemptNumber: number;
+      createdAt: string;
+      student: {
+        id: string;
+        name: string;
+        email: string;
+      };
+      assignment: {
+        id: string;
+        title: string;
+      };
+    }>;
+  };
+}
+

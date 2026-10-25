@@ -34,6 +34,7 @@ import { useAssignment } from "@/features/assignments/hooks/use-assignments";
 import {
   useReviewBySubmission,
   useCreateReview,
+  useUpdateReview,
 } from "@/features/reviews/hooks/use-reviews";
 import {
   reviewSchema,
@@ -56,6 +57,19 @@ export default function SubmissionDetailPage({
     useReviewBySubmission(submissionId);
 
   const createReviewMutation = useCreateReview();
+  const updateReviewMutation = useUpdateReview();
+
+  const isExistingOrTerminal =
+    Boolean(existingReview) ||
+    (submission &&
+      (submission.status === "APPROVED" ||
+        submission.status === "REJECTED" ||
+        submission.status === "RESUBMISSION_REQUESTED"));
+
+  const isReviewPending = createReviewMutation.isPending || updateReviewMutation.isPending;
+  const isReviewError = createReviewMutation.isError || updateReviewMutation.isError;
+  const reviewError = createReviewMutation.error || updateReviewMutation.error;
+  const isReviewSuccess = createReviewMutation.isSuccess || updateReviewMutation.isSuccess;
 
   const {
     register,
@@ -126,20 +140,40 @@ export default function SubmissionDetailPage({
     assignment?.submissionPolicy === "ONE_TIME";
 
   const onSubmitReview = (values: ReviewFormValues) => {
-    createReviewMutation.mutate(
-      {
-        submissionId: submission.id,
-        feedback: values.feedback || "",
-        status: values.status,
-        score: values.score,
-      },
-      {
-        onSuccess: () => {
-          refetchReview();
-          refetchSubmission();
+    if (isExistingOrTerminal) {
+      updateReviewMutation.mutate(
+        {
+          id: existingReview?.id || submission.id,
+          updates: {
+            submissionId: submission.id,
+            status: values.status,
+            feedback: values.feedback || "",
+            score: values.score,
+          },
         },
-      }
-    );
+        {
+          onSuccess: () => {
+            refetchReview();
+            refetchSubmission();
+          },
+        }
+      );
+    } else {
+      createReviewMutation.mutate(
+        {
+          submissionId: submission.id,
+          feedback: values.feedback || "",
+          status: values.status,
+          score: values.score,
+        },
+        {
+          onSuccess: () => {
+            refetchReview();
+            refetchSubmission();
+          },
+        }
+      );
+    }
   };
 
   const feedbacks = submission.feedbacks && submission.feedbacks.length > 0
@@ -340,18 +374,18 @@ export default function SubmissionDetailPage({
                     />
                   </FormField>
 
-                  {createReviewMutation.isError && (
+                  {isReviewError && (
                     <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-start gap-2">
                       <AlertCircle size={15} className="shrink-0 mt-0.5" />
                       <span>
-                        {createReviewMutation.error instanceof Error
-                          ? createReviewMutation.error.message
+                        {reviewError instanceof Error
+                          ? reviewError.message
                           : "Failed to apply review decision."}
                       </span>
                     </div>
                   )}
 
-                  {createReviewMutation.isSuccess && (
+                  {isReviewSuccess && (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center gap-1.5">
                       <CheckCircle2 size={15} /> Review and evaluation decision saved successfully!
                     </div>
@@ -359,7 +393,7 @@ export default function SubmissionDetailPage({
 
                   <div className="flex justify-end pt-2">
                     <SubmitButton
-                      isLoading={createReviewMutation.isPending}
+                      isLoading={isReviewPending}
                       loadingText="Saving Decision..."
                     >
                       {existingReview ? "Update Evaluation" : "Submit Evaluation Decision"}

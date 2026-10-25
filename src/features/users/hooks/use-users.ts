@@ -7,12 +7,19 @@ import { useSession } from "@/hooks/use-session";
 import type { PaginationParams } from "@/types/common";
 import type { User } from "@/types/domain";
 
-export function useUsers(params?: PaginationParams & { role?: string }) {
+export function useUsers(
+  params?: PaginationParams & {
+    role?: string;
+    search?: string;
+    status?: "active" | "inactive";
+  }
+) {
   const { user } = useSession();
 
   return useQuery({
     queryKey: queryKeys.users.list({ ...params, currentUserId: user?.id, userRole: user?.role }),
     queryFn: () => userService.list(params, user),
+    enabled: Boolean(user && user.role === "ADMIN"),
   });
 }
 
