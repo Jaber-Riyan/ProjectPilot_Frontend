@@ -7,7 +7,9 @@ import { useSession } from "@/hooks/use-session";
 import type { PaginationParams } from "@/types/common";
 import type { Assignment } from "@/types/domain";
 
-export function useAssignments(params?: PaginationParams & { courseId?: string }) {
+export function useAssignments(
+  params?: PaginationParams & { courseId?: string; status?: string; isPublished?: boolean }
+) {
   const { user } = useSession();
 
   return useQuery({
@@ -31,7 +33,7 @@ export function useCreateAssignment() {
   const { user } = useSession();
 
   return useMutation({
-    mutationFn: (input: Omit<Assignment, "id" | "createdAt" | "updatedAt">) =>
+    mutationFn: (input: Partial<Assignment> & { title: string; instructions: string }) =>
       assignmentService.create(input, user),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.assignments.all() });
@@ -49,7 +51,7 @@ export function useUpdateAssignment() {
       updates,
     }: {
       id: string;
-      updates: Partial<Omit<Assignment, "id" | "createdAt">>;
+      updates: Partial<Assignment>;
     }) => assignmentService.update(id, updates, user),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.assignments.all() });

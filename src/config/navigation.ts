@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   GraduationCap,
   LayoutDashboard,
+  Layers,
   Users,
 } from "lucide-react";
 import type { Permission } from "@/types/permissions";
@@ -34,6 +35,13 @@ export const MAIN_NAVIGATION: NavigationItem[] = [
     href: "/courses",
     icon: BookOpen,
     requiredPermissions: [PERMISSIONS.COURSE_READ],
+  },
+  {
+    label: "Modules",
+    href: "/modules",
+    icon: Layers,
+    requiredPermissions: [PERMISSIONS.MODULE_READ],
+    roleScope: ["MENTOR", "ADMIN"],
   },
   {
     label: "Assignments",

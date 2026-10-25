@@ -35,7 +35,7 @@ export default function SubmissionsPage() {
 
   const getPageDescription = () => {
     if (isStudent) return "Track your assignment attempts, evaluation outcomes, and mentor feedback.";
-    if (isMentor) return "Review student submissions for your assigned courses and provide scores and feedback.";
+    if (isMentor) return "Review student submissions for your assigned challenges and provide evaluation decisions and feedback.";
     return "Administrative oversight of all student submissions and mentor evaluations across the platform.";
   };
 
@@ -48,10 +48,15 @@ export default function SubmissionsPage() {
             href={`/submissions/${sub.id}`}
             className="font-semibold text-slate-900 hover:text-brand-600 transition"
           >
-            Submission #{sub.id.slice(-6)}
+            {sub.projectName || `Submission #${sub.id.slice(-6)}`}
           </Link>
           <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-            <span>Student: <code className="text-slate-700">{sub.studentId}</code></span>
+            <span>
+              Student:{" "}
+              <strong className="text-slate-700">
+                {sub.student?.name || sub.student?.email || sub.studentId.slice(0, 8)}
+              </strong>
+            </span>
             <span>•</span>
             <span>Attempt #{sub.attemptNumber}</span>
           </div>
@@ -59,14 +64,23 @@ export default function SubmissionsPage() {
       ),
     },
     {
-      header: "Assignment ID",
+      header: "Assignment",
       cell: (sub) => (
-        <Link
-          href={`/assignments/${sub.assignmentId}`}
-          className="text-xs font-mono text-brand-700 hover:underline"
-        >
-          {sub.assignmentId}
-        </Link>
+        <div className="max-w-xs">
+          <Link
+            href={`/assignments/${sub.assignmentId}`}
+            className="text-xs font-semibold text-brand-700 hover:underline truncate block"
+          >
+            {sub.assignment?.title || sub.assignmentId}
+          </Link>
+          {sub.assignment?.submissionPolicy && (
+            <span className="text-[11px] text-slate-400">
+              {sub.assignment.submissionPolicy === "ONE_TIME"
+                ? "Single Attempt"
+                : "Resubmissions Allowed"}
+            </span>
+          )}
+        </div>
       ),
     },
     {
@@ -96,7 +110,17 @@ export default function SubmissionsPage() {
       headerClassName: "text-right",
       cell: (sub) => (
         <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-          <Button asChild size="sm" variant={sub.status === "PENDING" && (isMentor || isAdmin) ? "default" : "outline"} className="h-8 text-xs">
+          <Button
+            asChild
+            size="sm"
+            variant={
+              (sub.status === "PENDING" || sub.status === "UNDER_REVIEW") &&
+              (isMentor || isAdmin)
+                ? "default"
+                : "outline"
+            }
+            className="h-8 text-xs"
+          >
             <Link href={`/submissions/${sub.id}`}>
               {isStudent ? "View Feedback" : "Review"}
             </Link>
@@ -129,6 +153,7 @@ export default function SubmissionsPage() {
             { label: "Under Review", value: "UNDER_REVIEW" },
             { label: "Approved", value: "APPROVED" },
             { label: "Needs Revision", value: "REJECTED" },
+            { label: "Resubmission Requested", value: "RESUBMISSION_REQUESTED" },
           ]}
         />
 

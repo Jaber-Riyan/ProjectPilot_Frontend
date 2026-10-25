@@ -27,7 +27,9 @@ export function useCreateReview() {
     }) => reviewService.create(input, user),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews.all() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.submissions.detail(variables.submissionId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.submissions.detail(variables.submissionId),
+      });
       queryClient.invalidateQueries({ queryKey: queryKeys.submissions.all() });
     },
   });
@@ -43,7 +45,7 @@ export function useUpdateReview() {
       updates,
     }: {
       id: string;
-      updates: Partial<Omit<Review, "id" | "createdAt" | "submissionId">>;
+      updates: Partial<Omit<Review, "id" | "createdAt">> & { submissionId?: string };
     }) => reviewService.update(id, updates, user),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.reviews.all() });

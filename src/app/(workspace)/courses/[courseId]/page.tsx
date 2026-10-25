@@ -74,15 +74,14 @@ export default function CourseDetailPage({
     }));
   }, [course, mockModules, allContent]);
 
+  const isMentorOrAdmin = user?.role === "MENTOR" || user?.role === "ADMIN";
   const canEdit =
-    Boolean(course && canAccessCourse(course, "edit")) ||
-    user?.role === "MENTOR" ||
-    user?.role === "ADMIN";
+    isMentorOrAdmin &&
+    (user?.role === "ADMIN" || Boolean(course && canAccessCourse(course, "edit")));
 
   const canDelete =
-    Boolean(course && canAccessCourse(course, "delete")) ||
-    user?.role === "ADMIN" ||
-    user?.role === "MENTOR";
+    isMentorOrAdmin &&
+    (user?.role === "ADMIN" || Boolean(course && canAccessCourse(course, "delete")));
 
   if (isLoading) {
     return (

@@ -13,6 +13,10 @@ import {
   Send,
   CheckCircle2,
   ExternalLink,
+  Github,
+  Globe,
+  AlertCircle,
+  FileText,
 } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -79,8 +83,10 @@ export default function AssignmentDetailPage({
     resolver: zodResolver(submissionSchema),
     defaultValues: {
       assignmentId,
-      answerText: "",
-      attachmentUrl: "",
+      projectName: "",
+      repoUrl: "",
+      liveUrl: "",
+      description: "",
     },
   });
 
@@ -116,8 +122,12 @@ export default function AssignmentDetailPage({
     createSubmissionMutation.mutate(
       {
         assignmentId: assignment.id,
-        answerText: values.answerText,
-        attachmentUrls: values.attachmentUrl ? [values.attachmentUrl] : [],
+        projectName: values.projectName,
+        repoUrl: values.repoUrl,
+        liveUrl: values.liveUrl ? values.liveUrl.trim() : null,
+        description: values.description ? values.description.trim() : null,
+        answerText: values.description || values.projectName,
+        attachmentUrls: [values.repoUrl, values.liveUrl].filter(Boolean) as string[],
       },
       {
         onSuccess: () => {
@@ -164,6 +174,20 @@ export default function AssignmentDetailPage({
         }
       />
 
+      {deleteMutation.isError && (
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-800 flex items-start gap-2">
+          <AlertCircle size={16} className="text-red-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Unable to delete assignment</p>
+            <p className="mt-0.5">
+              {deleteMutation.error instanceof Error
+                ? deleteMutation.error.message
+                : "Assignments with existing student submissions cannot be deleted."}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Meta Specs */}
       <div className="flex flex-wrap items-center gap-4 py-3 px-5 mb-8 rounded-2xl border border-slate-200 bg-white shadow-card text-xs text-slate-600">
         <div className="flex items-center gap-1.5">
@@ -171,8 +195,8 @@ export default function AssignmentDetailPage({
           <span>
             Due Date:{" "}
             <strong>
-              {assignment.dueDate
-                ? new Date(assignment.dueDate).toLocaleDateString()
+              {assignment.dueAt || assignment.dueDate
+                ? new Date(assignment.dueAt || assignment.dueDate!).toLocaleDateString()
                 : "Open / No Deadline"}
             </strong>
           </span>
@@ -191,7 +215,7 @@ export default function AssignmentDetailPage({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Instructions */}
+        {/* Left Column: Instructions & History */}
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader className="border-b border-slate-100">
@@ -228,12 +252,15 @@ export default function AssignmentDetailPage({
                   attempts.map((attempt) => (
                     <div
                       key={attempt.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-2"
+                      className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-900">
-                            Attempt #{attempt.attemptNumber}
+                            {attempt.projectName || `Attempt #${attempt.attemptNumber}`}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            (Attempt #{attempt.attemptNumber})
                           </span>
                           <StatusBadge status={attempt.status} />
                         </div>
@@ -247,26 +274,43 @@ export default function AssignmentDetailPage({
                         </div>
                       </div>
 
-                      {attempt.answerText && (
-                        <p className="text-xs text-slate-700 mt-2 bg-white p-3 rounded-lg border border-slate-100 leading-relaxed whitespace-pre-line">
-                          {attempt.answerText}
+                      {attempt.description && (
+                        <p className="text-xs text-slate-700 bg-white p-3 rounded-lg border border-slate-100 leading-relaxed whitespace-pre-line">
+                          {attempt.description}
                         </p>
                       )}
 
-                      {attempt.attachmentUrls && attempt.attachmentUrls.length > 0 && (
-                        <div className="pt-1">
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        {attempt.repoUrl && (
                           <a
-                            href={attempt.attachmentUrls[0]}
+                            href={attempt.repoUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline"
+                            className="inline-flex items-center gap-1.5 text-xs text-brand-700 hover:underline font-medium"
                           >
-                            <ExternalLink size={12} /> View Submission Attachment
+                            <Github size={13} /> Repository
                           </a>
+                        )}
+                        {attempt.liveUrl && (
+                          <a
+                            href={attempt.liveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs text-emerald-700 hover:underline font-medium"
+                          >
+                            <Globe size={13} /> Live Preview
+                          </a>
+                        )}
+                      </div>
+
+                      {attempt.feedbacks && attempt.feedbacks.length > 0 && (
+                        <div className="rounded-lg bg-blue-50/60 border border-blue-100 p-3 text-xs text-blue-900">
+                          <p className="font-semibold text-blue-950 mb-1">Mentor Feedback:</p>
+                          <p className="whitespace-pre-line">{attempt.feedbacks[0].comment}</p>
                         </div>
                       )}
 
-                      <div className="pt-2 text-right">
+                      <div className="pt-1 text-right">
                         <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
                           <Link href={`/submissions/${attempt.id}`}>
                             View Feedback Details →
@@ -305,24 +349,40 @@ export default function AssignmentDetailPage({
                   </p>
                 ) : (
                   allAssignmentSubmissions?.items.map((sub) => (
-                    <div key={sub.id} className="py-3 flex items-center justify-between">
+                    <div key={sub.id} className="py-3 flex items-center justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold text-slate-900">
-                            Student {sub.studentId}
+                            {sub.student?.name || `Student ${sub.studentId.slice(0, 8)}`}
                           </span>
                           <span className="text-[11px] text-slate-400">
                             (Attempt #{sub.attemptNumber})
                           </span>
                           <StatusBadge status={sub.status} />
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1">
+                        <p className="text-xs text-slate-700 font-medium mt-0.5">
+                          {sub.projectName || "Untitled Submission"}
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
                           Submitted {new Date(sub.submittedAt).toLocaleDateString()}
                         </p>
                       </div>
-                      <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-                        <Link href={`/submissions/${sub.id}`}>Review</Link>
-                      </Button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {sub.repoUrl && (
+                          <a
+                            href={sub.repoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                            title="Open repository"
+                          >
+                            <ExternalLink size={14} />
+                          </a>
+                        )}
+                        <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                          <Link href={`/submissions/${sub.id}`}>Review</Link>
+                        </Button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -336,8 +396,8 @@ export default function AssignmentDetailPage({
           {isStudent && (
             <Card>
               <CardHeader className="border-b border-slate-100">
-                <CardTitle className="text-sm font-bold text-slate-900">
-                  Submit Your Work
+                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <FileText size={16} className="text-brand-600" /> Submit Your Solution
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
@@ -348,26 +408,49 @@ export default function AssignmentDetailPage({
                 ) : (
                   <form onSubmit={handleSubmit(onSubmitSubmission)} className="space-y-4">
                     <FormField
-                      label="Submission Answer / Summary"
+                      label="Project Title"
                       required
-                      error={errors.answerText?.message}
-                      description="Explain your solution, architectural decisions, and how you met the criteria."
+                      error={errors.projectName?.message}
+                      description="Name your project implementation or milestone."
                     >
-                      <Textarea
-                        {...register("answerText")}
-                        rows={5}
-                        placeholder="Detailed explanation of your work..."
+                      <Input
+                        {...register("projectName")}
+                        placeholder="e.g. My LMS Architecture Implementation"
                       />
                     </FormField>
 
                     <FormField
-                      label="Project / Repository URL"
-                      error={errors.attachmentUrl?.message}
-                      description="Optional link to your GitHub repo, deployment, or design doc."
+                      label="GitHub / Repository URL"
+                      required
+                      error={errors.repoUrl?.message}
+                      description="Public repository containing your implementation code."
                     >
                       <Input
-                        {...register("attachmentUrl")}
+                        {...register("repoUrl")}
                         placeholder="https://github.com/username/project"
+                      />
+                    </FormField>
+
+                    <FormField
+                      label="Live Preview / Deployment URL"
+                      error={errors.liveUrl?.message}
+                      description="Optional deployment link (e.g. Vercel, Netlify, Cloudflare)."
+                    >
+                      <Input
+                        {...register("liveUrl")}
+                        placeholder="https://my-app.vercel.app"
+                      />
+                    </FormField>
+
+                    <FormField
+                      label="Notes / Architecture Overview"
+                      error={errors.description?.message}
+                      description="Optional notes on architectural decisions or challenges overcome."
+                    >
+                      <Textarea
+                        {...register("description")}
+                        rows={4}
+                        placeholder="Explain any details you would like the mentor to know..."
                       />
                     </FormField>
 
@@ -409,7 +492,9 @@ export default function AssignmentDetailPage({
               <CardContent className="pt-6 space-y-4 text-xs text-slate-600">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Created By</span>
-                  <span className="font-semibold text-slate-800">{assignment.createdById}</span>
+                  <span className="font-semibold text-slate-800">
+                    {assignment.createdBy?.name || assignment.createdById || "System"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Created Date</span>
@@ -425,6 +510,12 @@ export default function AssignmentDetailPage({
                     {allAssignmentSubmissions?.total ?? 0}
                   </span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Publication Status</span>
+                  <span className="font-semibold">
+                    {assignment.isPublished ? "Published" : "Draft"}
+                  </span>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -435,7 +526,7 @@ export default function AssignmentDetailPage({
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Delete Assignment"
-        description={`Are you sure you want to permanently delete "${assignment.title}"?`}
+        description={`Are you sure you want to permanently delete "${assignment.title}"? This action cannot be undone.`}
         confirmLabel="Delete"
         isLoading={deleteMutation.isPending}
         onConfirm={handleDelete}

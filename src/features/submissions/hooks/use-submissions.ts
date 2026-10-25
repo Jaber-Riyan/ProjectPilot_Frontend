@@ -6,7 +6,9 @@ import { submissionService } from "@/lib/services/submission.service";
 import { useSession } from "@/hooks/use-session";
 import type { PaginationParams } from "@/types/common";
 
-export function useSubmissions(params?: PaginationParams & { assignmentId?: string }) {
+export function useSubmissions(
+  params?: PaginationParams & { assignmentId?: string; status?: string; studentId?: string }
+) {
   const { user } = useSession();
 
   return useQuery({
@@ -35,12 +37,22 @@ export function useSubmissionAttempts(assignmentId: string, studentId: string) {
   });
 }
 
+export interface CreateSubmissionMutationInput {
+  assignmentId: string;
+  projectName?: string;
+  repoUrl?: string;
+  liveUrl?: string | null;
+  description?: string | null;
+  answerText?: string;
+  attachmentUrls?: string[];
+}
+
 export function useCreateSubmission() {
   const queryClient = useQueryClient();
   const { user } = useSession();
 
   return useMutation({
-    mutationFn: (input: { assignmentId: string; answerText?: string; attachmentUrls?: string[] }) =>
+    mutationFn: (input: CreateSubmissionMutationInput) =>
       submissionService.create(input, user),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.submissions.all() });

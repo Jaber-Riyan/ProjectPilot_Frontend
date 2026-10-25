@@ -17,6 +17,10 @@ export const queryKeys = {
     all: () => [...queryKeys.all, "modules"] as const,
     list: (courseId?: string) =>
       [...queryKeys.modules.all(), "list", courseId ?? "all"] as const,
+    byCourse: (courseId: string) =>
+      [...queryKeys.modules.all(), "byCourse", courseId] as const,
+    library: (params?: Record<string, unknown>) =>
+      [...queryKeys.modules.all(), "library", params ?? {}] as const,
     detail: (id: string) => [...queryKeys.modules.all(), "detail", id] as const,
   },
 
@@ -24,6 +28,8 @@ export const queryKeys = {
     all: () => [...queryKeys.all, "content"] as const,
     list: (moduleId?: string) =>
       [...queryKeys.content.all(), "list", moduleId ?? "all"] as const,
+    byModule: (moduleId: string) =>
+      [...queryKeys.content.all(), "byModule", moduleId] as const,
     detail: (id: string) => [...queryKeys.content.all(), "detail", id] as const,
   },
 
@@ -49,6 +55,8 @@ export const queryKeys = {
     all: () => [...queryKeys.all, "reviews"] as const,
     bySubmission: (submissionId: string) =>
       [...queryKeys.reviews.all(), "submission", submissionId] as const,
+    queue: (params?: Record<string, unknown>) =>
+      [...queryKeys.reviews.all(), "queue", params ?? {}] as const,
   },
 
   users: {

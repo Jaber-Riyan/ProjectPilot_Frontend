@@ -60,13 +60,40 @@ export interface Course {
 
 export interface CourseModule {
   id: string;
-  courseId: string;
+  courseId?: string;
   title: string;
-  description?: string;
+  description?: string | null;
+  isPublished?: boolean;
   order: number;
   contentIds: string[];
+  courseModuleId?: string;
+  createdById?: string | null;
+  contentItems?: ContentItem[];
+  _count?: {
+    contentItems: number;
+    courseModules: number;
+  };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ModuleDetailWithContent extends CourseModule {
+  contentItems: ContentItem[];
+  courseModules?: CourseModuleAssociation[];
+}
+
+export interface ModuleWithCount {
+  id: string;
+  title: string;
+  description: string | null;
+  isPublished: boolean;
+  createdById: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count: {
+    contentItems: number;
+    courseModules: number;
+  };
 }
 
 export type ContentType =
@@ -82,11 +109,70 @@ export interface ContentItem {
   title: string;
   type: ContentType;
   order: number;
-  body?: string;
-  url?: string;
-  assignmentId?: string;
+  description?: string | null;
+  body?: string | null;
+  url?: string | null;
+  assignmentId?: string | null;
+  assignment?: {
+    id: string;
+    title: string;
+    isPublished: boolean;
+  } | null;
+  module?: {
+    id: string;
+    title: string;
+    isPublished: boolean;
+    courseModules?: unknown[];
+  };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AttachOrAddModuleInput {
+  moduleId?: string;
+  title?: string;
+  description?: string | null;
+  isPublished?: boolean;
+  order?: number;
+}
+
+export interface CreateModuleInput {
+  title: string;
+  description?: string | null;
+  isPublished?: boolean;
+}
+
+export interface UpdateModuleInput {
+  title?: string;
+  description?: string | null;
+  isPublished?: boolean;
+}
+
+export interface ReorderModulesInput {
+  moduleIds: string[];
+}
+
+export interface CreateContentItemInput {
+  title: string;
+  type: ContentType;
+  description?: string | null;
+  body?: string | null;
+  url?: string | null;
+  assignmentId?: string | null;
+  order?: number;
+}
+
+export interface UpdateContentItemInput {
+  title?: string;
+  type?: ContentType;
+  description?: string | null;
+  body?: string | null;
+  url?: string | null;
+  assignmentId?: string | null;
+}
+
+export interface ReorderContentItemsInput {
+  contentItemIds: string[];
 }
 
 export type SubmissionPolicy = "ONE_TIME" | "RESUBMITTABLE";
@@ -100,10 +186,15 @@ export interface Assignment {
   description: string;
   instructions: string;
   status: AssignmentStatus;
+  isPublished?: boolean;
   submissionPolicy: SubmissionPolicy;
-  dueDate?: string;
+  dueDate?: string | null;
+  dueAt?: string | null;
   maxScore?: number;
-  createdById: string;
+  createdById?: string | null;
+  createdBy?: { id: string; email: string; name: string } | null;
+  contentItems?: Array<{ id: string; title: string; moduleId: string; order: number }>;
+  _count?: { submissions: number; contentItems: number };
   createdAt: string;
   updatedAt: string;
 }
@@ -115,18 +206,60 @@ export type SubmissionStatus =
   | "REJECTED"
   | "RESUBMISSION_REQUESTED";
 
+export interface SubmissionFeedback {
+  id: string;
+  submissionId: string;
+  mentorId: string;
+  comment: string;
+  createdAt: string;
+  updatedAt: string;
+  mentor?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+}
+
 export interface Submission {
   id: string;
   assignmentId: string;
   studentId: string;
   attemptNumber: number;
+  projectName?: string;
+  repoUrl?: string;
+  liveUrl?: string | null;
+  description?: string | null;
   answerText?: string;
   attachmentUrls?: string[];
   status: SubmissionStatus;
   score?: number;
-  submittedAt: string;
-  reviewedAt?: string;
+  reviewedById?: string | null;
   reviewerId?: string;
+  reviewedAt?: string | null;
+  submittedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  student?: {
+    id: string;
+    email: string;
+    name: string;
+  };
+  assignment?: {
+    id: string;
+    title: string;
+    instructions?: string;
+    submissionPolicy: SubmissionPolicy;
+    createdById?: string | null;
+  };
+  reviewedBy?: {
+    id: string;
+    email?: string;
+    name: string;
+  } | null;
+  feedbacks?: SubmissionFeedback[];
+  _count?: {
+    feedbacks: number;
+  };
 }
 
 export interface Review {

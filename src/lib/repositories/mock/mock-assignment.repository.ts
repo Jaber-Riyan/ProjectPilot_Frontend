@@ -12,7 +12,9 @@ export class MockAssignmentRepository implements IAssignmentRepository {
     if (params?.search) {
       const q = params.search.toLowerCase();
       assignments = assignments.filter(
-        (a) => a.title.toLowerCase().includes(q) || a.description.toLowerCase().includes(q)
+        (a) =>
+          a.title.toLowerCase().includes(q) ||
+          (a.description || "").toLowerCase().includes(q)
       );
     }
 
