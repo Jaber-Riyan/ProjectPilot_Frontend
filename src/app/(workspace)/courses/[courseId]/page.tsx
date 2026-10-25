@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   Plus,
+  Play,
 } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -44,6 +45,33 @@ export default function CourseDetailPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+  const [expandedContentItems, setExpandedContentItems] = useState<Record<string, boolean>>({});
+
+  const toggleContentItem = (itemId: string) => {
+    setExpandedContentItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
+  };
+
+  const getYouTubeEmbedUrl = (url?: string | null): string | null => {
+    if (!url) return null;
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname.includes("youtube.com")) {
+        const v = parsed.searchParams.get("v");
+        if (v) return `https://www.youtube-nocookie.com/embed/${v}`;
+        const pathParts = parsed.pathname.split("/").filter(Boolean);
+        if (pathParts[0] === "embed" && pathParts[1]) {
+          return `https://www.youtube-nocookie.com/embed/${pathParts[1]}`;
+        }
+      }
+      if (parsed.hostname.includes("youtu.be")) {
+        const id = parsed.pathname.slice(1);
+        if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  };
 
   const { data: course, isLoading, isError, error } = useCourse(courseId);
   const { data: mockModules = [] } = useModules(course?.id);
@@ -262,44 +290,190 @@ export default function CourseDetailPage({
                           No lessons added in this module.
                         </p>
                       ) : (
-                        moduleItems.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex flex-col sm:flex-row sm:items-center justify-between py-3 px-3 hover:bg-slate-50 rounded-xl transition gap-2"
-                          >
-                            <div className="flex items-start sm:items-center gap-3">
-                              <span className="grid size-7 place-items-center rounded-lg bg-slate-100 mt-0.5 sm:mt-0">
-                                {getContentIcon(item.type)}
-                              </span>
-                              <div>
-                                <p className="text-xs font-semibold text-slate-900">{item.title}</p>
-                                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                                  {item.type.replace("_", " ")}
-                                </span>
-                              </div>
-                            </div>
+                        moduleItems.map((item) => {
+                          const isContentOpen = expandedContentItems[item.id] ?? false;
+                          const embedUrl = getYouTubeEmbedUrl(item.url);
 
-                            <div className="flex items-center gap-2 pl-10 sm:pl-0">
-                              {item.assignmentId && (
-                                <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-                                  <Link href={`/assignments/${item.assignmentId}`}>
-                                    Open Assignment
-                                  </Link>
-                                </Button>
-                              )}
-                              {item.url && (
-                                <a
-                                  href={item.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
-                                >
-                                  View Resource <ExternalLink size={12} />
-                                </a>
+                          return (
+                            <div
+                              key={item.id}
+                              className="rounded-xl border border-transparent hover:border-slate-200/80 transition overflow-hidden"
+                            >
+                              <div
+                                onClick={() => toggleContentItem(item.id)}
+                                role="button"
+                                tabIndex={0}
+                                className="w-full flex items-center justify-between py-2.5 px-3 hover:bg-slate-50/80 rounded-xl transition cursor-pointer gap-2 text-left"
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <span className="grid size-7 place-items-center rounded-lg bg-slate-100 shrink-0">
+                                    {getContentIcon(item.type)}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-slate-900 truncate">
+                                      {item.title}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+                                      <span className="uppercase font-bold tracking-wider">
+                                        {item.type.replace("_", " ")}
+                                      </span>
+                                      {item.description && (
+                                        <>
+                                          <span>•</span>
+                                          <span className="truncate max-w-xs">{item.description}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  {item.assignmentId && (
+                                    <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                                      <Link href={`/assignments/${item.assignmentId}`}>
+                                        Open Assignment
+                                      </Link>
+                                    </Button>
+                                  )}
+                                  {item.url && (
+                                    <a
+                                      href={item.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline px-1"
+                                    >
+                                      Resource <ExternalLink size={12} />
+                                    </a>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleContentItem(item.id)}
+                                    className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                                    title={isContentOpen ? "Collapse Lesson Details" : "View Lesson Details"}
+                                  >
+                                    {isContentOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Expanded Content Drawer */}
+                              {isContentOpen && (
+                                <div className="mx-2 mb-3 mt-1 p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3 animate-in fade-in-50 duration-150">
+                                  {item.description && (
+                                    <div className="text-xs text-slate-600 font-medium pb-2 border-b border-slate-200/60">
+                                      <span className="text-slate-400 font-semibold mr-1.5 uppercase text-[10px] tracking-wider">
+                                        Overview:
+                                      </span>
+                                      {item.description}
+                                    </div>
+                                  )}
+
+                                  {/* TEXT Content Body */}
+                                  {item.type === "TEXT" && (
+                                    <div>
+                                      {item.body ? (
+                                        <div className="whitespace-pre-wrap font-sans text-xs sm:text-sm text-slate-800 leading-relaxed bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                                          {item.body}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-slate-400 italic">
+                                          No reading body has been added for this text lesson yet.
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* VIDEO or YOUTUBE_VIDEO */}
+                                  {(item.type === "VIDEO" || item.type === "YOUTUBE_VIDEO") && (
+                                    <div className="space-y-2">
+                                      {embedUrl ? (
+                                        <div className="relative w-full aspect-video rounded-xl overflow-hidden shadow-sm border border-slate-200 bg-black">
+                                          <iframe
+                                            src={embedUrl}
+                                            title={item.title}
+                                            className="absolute inset-0 w-full h-full"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                          />
+                                        </div>
+                                      ) : item.url ? (
+                                        <div className="p-4 rounded-xl bg-white border border-slate-200 flex flex-col gap-2">
+                                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">
+                                            <Play size={14} className="text-blue-500" />
+                                            <span>Video Stream Resource</span>
+                                          </div>
+                                          <p className="text-xs text-slate-500 break-all">{item.url}</p>
+                                          <div>
+                                            <Button asChild size="sm" variant="default" className="text-xs gap-1.5 mt-1">
+                                              <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                                Watch Video in New Tab <ExternalLink size={12} />
+                                              </a>
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-slate-400 italic">No video URL linked yet.</p>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* LINK External Resource */}
+                                  {item.type === "LINK" && (
+                                    <div className="p-4 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                                          <ExternalLink size={13} className="text-purple-600" />
+                                          <span>External Learning Resource</span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 font-mono mt-1 break-all">
+                                          {item.url || "No link provided"}
+                                        </p>
+                                      </div>
+                                      {item.url && (
+                                        <Button asChild size="sm" className="shrink-0 text-xs gap-1">
+                                          <a href={item.url} target="_blank" rel="noopener noreferrer">
+                                            Open Resource <ExternalLink size={12} />
+                                          </a>
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* ASSIGNMENT Link Card */}
+                                  {item.type === "ASSIGNMENT" && (
+                                    <div className="p-4 rounded-xl bg-white border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                      <div>
+                                        <div className="text-xs font-semibold text-amber-900 flex items-center gap-1.5">
+                                          <GraduationCap size={15} className="text-amber-600" />
+                                          <span>Curriculum Assignment</span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 mt-1">
+                                          Assessment linked to module. Complete and submit your work for mentor evaluation.
+                                        </p>
+                                      </div>
+                                      {item.assignmentId ? (
+                                        <Button asChild size="sm" className="shrink-0 text-xs gap-1">
+                                          <Link href={`/assignments/${item.assignmentId}`}>
+                                            View Assignment Assessment <ChevronRight size={13} />
+                                          </Link>
+                                        </Button>
+                                      ) : (
+                                        <span className="text-xs text-slate-400">No assignment ID linked</span>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Body text fallback if any other content type also has body */}
+                                  {item.type !== "TEXT" && item.body && (
+                                    <div className="whitespace-pre-wrap font-sans text-xs text-slate-700 bg-white p-3 rounded-lg border border-slate-200">
+                                      {item.body}
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   )}

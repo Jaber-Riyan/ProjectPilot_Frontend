@@ -19,6 +19,9 @@ import {
   Edit,
   Unlink,
   AlertCircle,
+  Search,
+  Check,
+  X,
 } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { PageHeader } from "@/components/layout/page-header";
@@ -41,6 +44,7 @@ import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSession } from "@/hooks/use-session";
 import { useCourse } from "@/features/courses/hooks/use-courses";
+import { useAssignments } from "@/features/assignments/hooks/use-assignments";
 import {
   useCourseModules,
   useAttachOrAddModule,
@@ -86,7 +90,9 @@ export default function CourseModulesManagementPage({
     data: modules = [],
     isLoading: isModulesLoading,
   } = useCourseModules(course?.id);
-  const { data: libraryData } = useModulesLibrary({ limit: 100 });
+  const { data: libraryData } = useModulesLibrary({ limit: 200 });
+  const { data: assignmentsData } = useAssignments({ limit: 100 });
+  const assignmentsList = useMemo(() => assignmentsData?.items ?? [], [assignmentsData]);
 
   const attachOrAddMutation = useAttachOrAddModule(course?.id || "");
   const detachMutation = useDetachModule(course?.id || "");
@@ -100,11 +106,14 @@ export default function CourseModulesManagementPage({
   // State management
   const [addModuleOpen, setAddModuleOpen] = useState(false);
   const [moduleMode, setModuleMode] = useState<"NEW" | "EXISTING">("NEW");
+  const [librarySearch, setLibrarySearch] = useState("");
   const [editModuleItem, setEditModuleItem] = useState<ModuleDetailWithContent | null>(null);
   const [detachModuleTarget, setDetachModuleTarget] = useState<ModuleDetailWithContent | null>(null);
 
   const [addContentModuleId, setAddContentModuleId] = useState<string | null>(null);
+  const [addAssignmentSearch, setAddAssignmentSearch] = useState("");
   const [editContentItem, setEditContentItem] = useState<ContentItem | null>(null);
+  const [editAssignmentSearch, setEditAssignmentSearch] = useState("");
   const [deleteContentId, setDeleteContentId] = useState<string | null>(null);
 
   const [actionError, setActionError] = useState<string | null>(null);
@@ -116,12 +125,24 @@ export default function CourseModulesManagementPage({
     return libraryData.items.filter((libMod) => !attachedIds.has(libMod.id));
   }, [libraryData, modules]);
 
+  // Filtered library modules based on search
+  const filteredLibraryModules = useMemo(() => {
+    if (!librarySearch.trim()) return availableLibraryModules;
+    const q = librarySearch.toLowerCase().trim();
+    return availableLibraryModules.filter(
+      (m) =>
+        m.title.toLowerCase().includes(q) ||
+        (m.description && m.description.toLowerCase().includes(q))
+    );
+  }, [availableLibraryModules, librarySearch]);
+
   // Add / Attach Module Form
   const {
     register: regAttach,
     handleSubmit: handleAttachSubmit,
     reset: resetAttach,
     setValue: setAttachValue,
+    watch: watchAttach,
     formState: { errors: attachErrors },
   } = useForm<AttachOrAddModuleFormValues>({
     resolver: zodResolver(attachOrAddModuleSchema),
@@ -151,6 +172,7 @@ export default function CourseModulesManagementPage({
     handleSubmit: handleCntSubmit,
     reset: resetCnt,
     watch: watchCnt,
+    setValue: setCntValue,
     formState: { errors: cntErrors },
   } = useForm<ContentFormValues>({
     resolver: zodResolver(contentSchema),
@@ -172,13 +194,41 @@ export default function CourseModulesManagementPage({
     handleSubmit: handleEditCntSubmit,
     reset: resetEditCnt,
     watch: watchEditCnt,
+    setValue: setEditCntValue,
     formState: { errors: editCntErrors },
   } = useForm<UpdateContentFormValues>({
     resolver: zodResolver(updateContentItemSchema),
   });
 
   const selectedContentType = watchCnt("type");
+  const selectedAssignmentId = watchCnt("assignmentId");
   const selectedEditContentType = watchEditCnt("type");
+  const selectedEditAssignmentId = watchEditCnt("assignmentId");
+  const selectedModuleId = watchAttach("moduleId");
+
+  // Filtered assignments for Add Content
+  const filteredAssignments = useMemo(() => {
+    if (!addAssignmentSearch.trim()) return assignmentsList;
+    const q = addAssignmentSearch.toLowerCase().trim();
+    return assignmentsList.filter(
+      (a) =>
+        a.title.toLowerCase().includes(q) ||
+        a.submissionPolicy.toLowerCase().includes(q) ||
+        (a.instructions && a.instructions.toLowerCase().includes(q))
+    );
+  }, [assignmentsList, addAssignmentSearch]);
+
+  // Filtered assignments for Edit Content
+  const filteredEditAssignments = useMemo(() => {
+    if (!editAssignmentSearch.trim()) return assignmentsList;
+    const q = editAssignmentSearch.toLowerCase().trim();
+    return assignmentsList.filter(
+      (a) =>
+        a.title.toLowerCase().includes(q) ||
+        a.submissionPolicy.toLowerCase().includes(q) ||
+        (a.instructions && a.instructions.toLowerCase().includes(q))
+    );
+  }, [assignmentsList, editAssignmentSearch]);
 
   if (isCourseLoading || isModulesLoading) {
     return (
@@ -388,6 +438,7 @@ export default function CourseModulesManagementPage({
               onClick={() => {
                 setActionError(null);
                 setModuleMode("NEW");
+                setLibrarySearch("");
                 resetAttach({
                   mode: "NEW",
                   moduleId: "",
@@ -439,6 +490,7 @@ export default function CourseModulesManagementPage({
               onClick={() => {
                 setActionError(null);
                 setModuleMode("NEW");
+                setLibrarySearch("");
                 resetAttach({
                   mode: "NEW",
                   moduleId: "",
@@ -517,6 +569,7 @@ export default function CourseModulesManagementPage({
                       variant="outline"
                       onClick={() => {
                         setActionError(null);
+                        setAddAssignmentSearch("");
                         resetCnt({
                           moduleId: mod.id,
                           title: "",
@@ -622,6 +675,7 @@ export default function CourseModulesManagementPage({
                           <button
                             onClick={() => {
                               setActionError(null);
+                              setEditAssignmentSearch("");
                               setEditContentItem(item);
                               resetEditCnt({
                                 title: item.title,
@@ -704,26 +758,103 @@ export default function CourseModulesManagementPage({
 
           <div className="space-y-4 py-2">
             {moduleMode === "EXISTING" ? (
-              <FormField
-                label="Select Library Module"
-                required
-                error={attachErrors.moduleId?.message}
-              >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Select Library Module <span className="text-red-500">*</span>
+                  </label>
+                  {selectedModuleId && (
+                    <span className="text-[11px] font-normal text-emerald-600 font-mono truncate max-w-[200px]">
+                      Selected: {availableLibraryModules.find((m) => m.id === selectedModuleId)?.title || selectedModuleId.slice(0, 8)}
+                    </span>
+                  )}
+                </div>
+
+                <input type="hidden" {...regAttach("moduleId")} />
+
                 {availableLibraryModules.length === 0 ? (
                   <p className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
                     No unattached library modules available. Switch to &quot;Create New Module&quot; to author a new syllabus unit.
                   </p>
                 ) : (
-                  <Select {...regAttach("moduleId")}>
-                    <option value="">-- Choose a module to attach --</option>
-                    {availableLibraryModules.map((libMod) => (
-                      <option key={libMod.id} value={libMod.id}>
-                        {libMod.title} ({libMod._count?.contentItems ?? 0} lessons)
-                      </option>
-                    ))}
-                  </Select>
+                  <>
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        value={librarySearch}
+                        onChange={(e) => setLibrarySearch(e.target.value)}
+                        placeholder="Search modules by title or description..."
+                        className="pl-8 text-xs h-9"
+                      />
+                      {librarySearch && (
+                        <button
+                          type="button"
+                          onClick={() => setLibrarySearch("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 border border-slate-200 rounded-xl p-2 bg-slate-50/50">
+                      {filteredLibraryModules.length === 0 ? (
+                        <p className="text-xs text-slate-400 text-center py-4">
+                          No library modules matching &quot;{librarySearch}&quot;.
+                        </p>
+                      ) : (
+                        filteredLibraryModules.map((libMod) => {
+                          const isSelected = selectedModuleId === libMod.id;
+                          return (
+                            <div
+                              key={libMod.id}
+                              onClick={() => setAttachValue("moduleId", libMod.id, { shouldValidate: true })}
+                              role="button"
+                              tabIndex={0}
+                              className={`flex items-start justify-between p-2.5 rounded-lg border text-left cursor-pointer transition ${
+                                isSelected
+                                  ? "border-brand-500 bg-blue-50/70 shadow-sm"
+                                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="flex items-center gap-1.5">
+                                  <Layers size={14} className={isSelected ? "text-brand-600" : "text-slate-400"} />
+                                  <span className={`text-xs font-semibold truncate ${isSelected ? "text-brand-900" : "text-slate-800"}`}>
+                                    {libMod.title}
+                                  </span>
+                                </div>
+                                {libMod.description && (
+                                  <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                                    {libMod.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                                  <span>{libMod._count?.contentItems ?? 0} lessons</span>
+                                  <span>•</span>
+                                  <span>{libMod.isPublished ? "Published" : "Draft"}</span>
+                                </div>
+                              </div>
+
+                              {isSelected && (
+                                <span className="grid size-5 place-items-center rounded-full bg-brand-600 text-white shrink-0 mt-0.5">
+                                  <Check size={11} strokeWidth={3} />
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
                 )}
-              </FormField>
+
+                {attachErrors.moduleId?.message && (
+                  <p className="text-[11px] text-red-600 font-medium">
+                    {attachErrors.moduleId.message}
+                  </p>
+                )}
+              </div>
             ) : (
               <>
                 <FormField label="Module Title" required error={attachErrors.title?.message}>
@@ -894,13 +1025,110 @@ export default function CourseModulesManagementPage({
             )}
 
             {selectedContentType === "ASSIGNMENT" && (
-              <FormField
-                label="Associated Assignment UUID"
-                required
-                error={cntErrors.assignmentId?.message}
-              >
-                <Input {...regCnt("assignmentId")} placeholder="UUID of published assignment" />
-              </FormField>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Associated Assignment <span className="text-red-500">*</span>
+                  </label>
+                  {selectedAssignmentId && (
+                    <span className="text-[11px] font-normal text-emerald-600 font-mono truncate max-w-[200px]">
+                      Selected: {assignmentsList.find((a) => a.id === selectedAssignmentId)?.title || selectedAssignmentId.slice(0, 8)}
+                    </span>
+                  )}
+                </div>
+
+                <input type="hidden" {...regCnt("assignmentId")} />
+
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={addAssignmentSearch}
+                    onChange={(e) => setAddAssignmentSearch(e.target.value)}
+                    placeholder="Search assignment by title or policy..."
+                    className="pl-8 text-xs h-9"
+                  />
+                  {addAssignmentSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setAddAssignmentSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1 border border-slate-200 rounded-xl p-2 bg-slate-50/50">
+                  {filteredAssignments.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-4">
+                      {assignmentsList.length === 0
+                        ? "No assignments available. Create an assignment in Assignments workspace first."
+                        : `No assignments matching "${addAssignmentSearch}".`}
+                    </p>
+                  ) : (
+                    filteredAssignments.map((asg) => {
+                      const isSelected = selectedAssignmentId === asg.id;
+                      return (
+                        <div
+                          key={asg.id}
+                          onClick={() => setCntValue("assignmentId", asg.id, { shouldValidate: true })}
+                          role="button"
+                          tabIndex={0}
+                          className={`flex items-start justify-between p-2.5 rounded-lg border text-left cursor-pointer transition ${
+                            isSelected
+                              ? "border-brand-500 bg-blue-50/70 shadow-sm"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="flex items-center gap-1.5">
+                              <GraduationCap
+                                size={14}
+                                className={isSelected ? "text-brand-600" : "text-slate-400"}
+                              />
+                              <span
+                                className={`text-xs font-semibold truncate ${
+                                  isSelected ? "text-brand-900" : "text-slate-800"
+                                }`}
+                              >
+                                {asg.title}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-medium ${
+                                  asg.submissionPolicy === "RESUBMITTABLE"
+                                    ? "bg-purple-50 text-purple-700"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {asg.submissionPolicy === "RESUBMITTABLE"
+                                  ? "Resubmissions Allowed"
+                                  : "Single Attempt"}
+                              </span>
+                              {asg.dueAt && (
+                                <span>Due: {new Date(asg.dueAt).toLocaleDateString()}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {isSelected && (
+                            <span className="grid size-5 place-items-center rounded-full bg-brand-600 text-white shrink-0 mt-0.5">
+                              <Check size={11} strokeWidth={3} />
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {cntErrors.assignmentId?.message && (
+                  <p className="text-[11px] text-red-600 font-medium">
+                    {cntErrors.assignmentId.message}
+                  </p>
+                )}
+              </div>
             )}
 
             <FormField label="Order in Module" error={cntErrors.order?.message}>
@@ -973,13 +1201,110 @@ export default function CourseModulesManagementPage({
             )}
 
             {selectedEditContentType === "ASSIGNMENT" && (
-              <FormField
-                label="Associated Assignment UUID"
-                required
-                error={editCntErrors.assignmentId?.message}
-              >
-                <Input {...regEditCnt("assignmentId")} />
-              </FormField>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Associated Assignment <span className="text-red-500">*</span>
+                  </label>
+                  {selectedEditAssignmentId && (
+                    <span className="text-[11px] font-normal text-emerald-600 font-mono truncate max-w-[200px]">
+                      Selected: {assignmentsList.find((a) => a.id === selectedEditAssignmentId)?.title || selectedEditAssignmentId.slice(0, 8)}
+                    </span>
+                  )}
+                </div>
+
+                <input type="hidden" {...regEditCnt("assignmentId")} />
+
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={editAssignmentSearch}
+                    onChange={(e) => setEditAssignmentSearch(e.target.value)}
+                    placeholder="Search assignment by title or policy..."
+                    className="pl-8 text-xs h-9"
+                  />
+                  {editAssignmentSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setEditAssignmentSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1 border border-slate-200 rounded-xl p-2 bg-slate-50/50">
+                  {filteredEditAssignments.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-4">
+                      {assignmentsList.length === 0
+                        ? "No assignments available."
+                        : `No assignments matching "${editAssignmentSearch}".`}
+                    </p>
+                  ) : (
+                    filteredEditAssignments.map((asg) => {
+                      const isSelected = selectedEditAssignmentId === asg.id;
+                      return (
+                        <div
+                          key={asg.id}
+                          onClick={() => setEditCntValue("assignmentId", asg.id, { shouldValidate: true })}
+                          role="button"
+                          tabIndex={0}
+                          className={`flex items-start justify-between p-2.5 rounded-lg border text-left cursor-pointer transition ${
+                            isSelected
+                              ? "border-brand-500 bg-blue-50/70 shadow-sm"
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="flex items-center gap-1.5">
+                              <GraduationCap
+                                size={14}
+                                className={isSelected ? "text-brand-600" : "text-slate-400"}
+                              />
+                              <span
+                                className={`text-xs font-semibold truncate ${
+                                  isSelected ? "text-brand-900" : "text-slate-800"
+                                }`}
+                              >
+                                {asg.title}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-medium ${
+                                  asg.submissionPolicy === "RESUBMITTABLE"
+                                    ? "bg-purple-50 text-purple-700"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {asg.submissionPolicy === "RESUBMITTABLE"
+                                  ? "Resubmissions Allowed"
+                                  : "Single Attempt"}
+                              </span>
+                              {asg.dueAt && (
+                                <span>Due: {new Date(asg.dueAt).toLocaleDateString()}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {isSelected && (
+                            <span className="grid size-5 place-items-center rounded-full bg-brand-600 text-white shrink-0 mt-0.5">
+                              <Check size={11} strokeWidth={3} />
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {editCntErrors.assignmentId?.message && (
+                  <p className="text-[11px] text-red-600 font-medium">
+                    {editCntErrors.assignmentId.message}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
